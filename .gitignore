@@ -1,0 +1,9 @@
+studio-mobile/node_modules/
+studio-mobile/.expo/
+studio-mobile/.expo-shared/
+studio-mobile/dist/
+studio-mobile/dist-preview/
+studio-mobile/ios/
+studio-mobile/android/
+*.log
+.DS_Store

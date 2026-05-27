@@ -1,0 +1,9 @@
+node_modules/
+.expo/
+.expo-shared/
+dist/
+dist-preview/
+ios/
+android/
+*.log
+DerivedData/

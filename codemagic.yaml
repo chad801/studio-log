@@ -1,0 +1,118 @@
+workflows:
+  ios-testflight-studio-log:
+    name: Studio Log - iOS TestFlight
+    max_build_duration: 90
+    environment:
+      groups:
+        - ios-signing
+        - app-store-connect
+      node: v20
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: com.broadhead.studiolog
+        APP_SCHEME: StudioLog
+    scripts:
+      - name: Install dependencies
+        working_directory: studio-mobile
+        script: npm ci
+
+      - name: Run automated checks
+        working_directory: studio-mobile
+        script: npm run check
+
+      - name: Expo prebuild iOS
+        working_directory: studio-mobile
+        script: |
+          export CI=1
+          npx expo prebuild --platform ios --clean
+
+      - name: Install CocoaPods
+        working_directory: studio-mobile/ios
+        script: pod install
+
+      - name: Install certificate and provisioning profile
+        script: |
+          set -euo pipefail
+          : "${APPLE_TEAM_ID:?APPLE_TEAM_ID is required}"
+          : "${PROFILE_UUID:?PROFILE_UUID is required}"
+          : "${CERT_P12:?CERT_P12 is required}"
+          : "${CERT_PASSWORD:?CERT_PASSWORD is required}"
+          : "${PROVISIONING_PROFILE:?PROVISIONING_PROFILE is required}"
+
+          printf '%s' "$CERT_P12" | tr -d '\r\n' | base64 --decode > /tmp/studio-log-dist.p12
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import /tmp/studio-log-dist.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
+
+          printf '%s' "$PROVISIONING_PROFILE" | tr -d '\r\n' | base64 --decode > /tmp/studio-log.mobileprovision
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp /tmp/studio-log.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          security find-identity -v -p codesigning build.keychain
+
+      - name: Archive and export IPA
+        working_directory: studio-mobile/ios
+        script: |
+          set -euo pipefail
+          security unlock-keychain -p "" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          unset PROVISIONING_PROFILE
+
+          BUILD_NO="${BUILD_NUMBER:-1}"
+
+          xcodebuild \
+            -workspace "$APP_SCHEME.xcworkspace" \
+            -scheme "$APP_SCHEME" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath /tmp/StudioLog.xcarchive \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="iPhone Distribution" \
+            PROVISIONING_PROFILE="$PROFILE_UUID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CURRENT_PROJECT_VERSION="$BUILD_NO" \
+            MARKETING_VERSION="0.1.0" \
+            OTHER_CODE_SIGN_FLAGS="--keychain build.keychain" \
+            archive
+
+          cat > /tmp/ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>$BUNDLE_ID</key>
+              <string>$PROFILE_UUID</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+          mkdir -p build/ios/ipa
+          xcodebuild \
+            -exportArchive \
+            -archivePath /tmp/StudioLog.xcarchive \
+            -exportOptionsPlist /tmp/ExportOptions.plist \
+            -exportPath build/ios/ipa \
+            OTHER_CODE_SIGN_FLAGS="--keychain build.keychain"
+
+    artifacts:
+      - studio-mobile/ios/build/ios/ipa/*.ipa
+      - /tmp/StudioLog.xcarchive/dSYMs/**
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+        release_notes: $TESTFLIGHT_RELEASE_NOTES

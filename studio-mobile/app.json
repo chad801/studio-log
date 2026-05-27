@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Studio Log",
+    "slug": "studio-log",
+    "scheme": "studiolog",
+    "version": "0.1.0",
+    "platforms": [
+      "ios"
+    ],
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.broadhead.studiolog",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Studio Log uses the camera to capture process photos, test tiles, kiln loads, and finished pieces.",
+        "NSPhotoLibraryUsageDescription": "Studio Log imports photos from your library for recipes, projects, firings, inspiration, and gallery pieces.",
+        "NSPhotoLibraryAddUsageDescription": "Studio Log may save exported studio assets when you choose to share or back up data."
+      }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ]
+    ],
+    "extra": {}
+  }
+}
