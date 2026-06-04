@@ -4,8 +4,7 @@ workflows:
     max_build_duration: 90
     environment:
       groups:
-        - ios-signing
-        - app-store-connect
+        - Studio Log
       node: v20
       xcode: latest
       cocoapods: default
